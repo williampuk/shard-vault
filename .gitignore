@@ -1,0 +1,11 @@
+/shardvault
+*.exe
+*.test
+*.out
+# Backup file artifacts should NEVER be committed.
+share-*.txt
+*.shares
+backups/
+
+__pycache__/
+*.pyc

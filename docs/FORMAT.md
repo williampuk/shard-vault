@@ -21,6 +21,57 @@ All multibyte integers: **big-endian**. All strings: **UTF-8**, with no Unicode 
 
 An individual share exposes its threshold, total, index, set ID, and Y-byte length. **Never mix separate backup sets**, even if they have matching thresholds. The share checksum is a **public accidental-corruption check** (not a MAC or digital signature).
 
+## Optional B39WORDS1 English-word transport encoding
+
+**Added after the original v1 review.** This is a new, alternative representation of
+the **identical** binary `B39SHR1` wrapper. It changes neither the Shamir
+polynomial nor the B39SSS1 serialized wrapper. Existing share tokens remain
+valid, and a share encoded as words decodes byte-for-byte to its existing token.
+
+Syntax: `B39WORDS1:` followed by one or more whitespace-separated, lowercase
+**English BIP-39 dictionary words**, in their original order. Exported word
+files place the prefix on its own line and wrap at six words per line;
+whitespace is only formatting. Keep the prefix when writing or restoring shares.
+
+An independent decoder can:
+
+1. Look up every word's **zero-based index 0..2047** in the standard
+   2048-entry *English BIP-39 wordlist* (not a special SLIP-39 dictionary).
+2. Express each index as **11 bits, most-significant bit first**, and
+   concatenate the bit strings in order.
+3. Convert the bits into bytes, most-significant bit first. Bytes 26–27 of
+   this wrapper give the big-endian Shamir payload length **L**, exactly as in
+   B39SSS1.
+4. Compute the required raw byte length `R = 28 + L + 32` and required word
+   count `W = ceil(8*R/11)`. Reject invalid L, an incorrect number of words,
+   and **any nonzero trailing bits** after the first `8*R` bits.
+5. Retain the first R bytes and parse them as the ordinary `B39SHR1` binary
+   wrapper, including the existing full SHA-256 checksum and all field checks.
+
+The encoder simply runs the above in reverse, padding **only at the end**
+with zero bits to complete the final 11-bit word. There is no separate
+BIP-39 mnemonic checksum: the **existing wrapper SHA-256** is preserved.
+Using a BIP-39 dictionary does **not** turn a word share into a valid wallet
+recovery mnemonic. It is **not SLIP-39, AirGap's proprietary share encoding,
+or a wallet-standard recovery format**.
+
+With no included passphrase, a 12-word BIP-39 wallet results in **87
+dictionary words per share**, and a 24-word wallet results in **99**.
+With a 512-byte passphrase and 24-word wallet, each share is **471 words**.
+This deliberately favors full binary compatibility over compactness. File
+imports are bounded and allow either format, including mixing formats among
+shares from the same backup. Do not silently strip this format prefix, use a
+different dictionary, or add a BIP-39 checksum to the word stream.
+
+### Example of the prefix and layout (NOT a real share)
+
+```text
+B39WORDS1:
+abandon ability able about above absent
+absorb abstract absurd abuse access accident
+... (redacted; NOT usable for recovery)
+```
+
 ## Inner payload (Shamir-protected; readable only after m shares)
 
 | Offset | Width | Field |

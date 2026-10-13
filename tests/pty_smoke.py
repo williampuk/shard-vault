@@ -137,8 +137,65 @@ def cancellation_and_errors():
         assert result.returncode == 1 and b'interactive TTY' in result.stderr
 
 
+def word_format_roundtrip():
+    # A disposable PUBLIC test vector; no real wallet material is used.
+    mnemonic = ' '.join(['abandon'] * 11 + ['about'])
+    with tempfile.TemporaryDirectory(prefix='public-word-share-test-') as temp:
+        word_dir = Path(temp) / 'words'
+        token_dir = Path(temp) / 'tokens'
+        single = Path(temp) / 'one-word-share.txt'
+        session = Session()
+        session.expect('Choose'); session.send('1')
+        session.expect('BIP-39 mnemonic (hidden'); session.send(mnemonic, paste=True)
+        session.expect('Include the BIP-39 passphrase'); session.send('n')
+        session.expect('Number of shares'); session.send('3')
+        session.expect('Shares required to recover'); session.send('2')
+        session.expect('Choose')
+        session.send('t')
+        session.expect('B39WORDS1: English words')
+        session.expect('Choose')
+        session.send('w')
+        session.expect('Share index to save'); session.send('1')
+        session.expect('Absolute or relative new file path'); session.send(str(single))
+        session.expect('Share saved with restrictive permissions.')
+        session.expect('Enter to continue'); session.send()
+        session.expect('Choose')
+        session.send('e')
+        session.expect('Type EXPORT ALL'); session.send('EXPORT ALL')
+        session.expect('Name of NEW private folder'); session.send(str(word_dir))
+        session.expect('Export complete.'); session.expect('Enter to continue'); session.send()
+        session.expect('Choose')
+        session.send('a')
+        session.expect('Type EXPORT ALL'); session.send('EXPORT ALL')
+        session.expect('Name of NEW private folder'); session.send(str(token_dir))
+        session.expect('Export complete.'); session.expect('Enter to continue'); session.send()
+        session.expect('Choose')
+        assert single.read_text().startswith('B39WORDS1:')
+        assert len(single.read_text().split()) == 88  # prefix + 87 words
+        assert (word_dir / 'share-02.txt').read_text().startswith('B39WORDS1:')
+        assert (token_dir / 'share-02.txt').read_text().startswith('B39SSS1:')
+        session.send('v')
+        for folder, i in [(word_dir, 3), (token_dir, 2), (word_dir, 1)]:
+            session.expect('(paste token or @file; q cancels)')
+            session.send('@' + str(folder / f'share-{i:02}.txt'))
+        session.expect('SUCCESS: all n'); session.expect('Enter to continue'); session.send()
+        session.expect('Backup verification: PASSED')
+        session.expect('Choose'); session.send('q')
+        session.expect('Choose'); session.send('2')
+        for file in [single, token_dir / 'share-03.txt']:
+            session.expect('(paste token or @file; q cancels)')
+            session.send('@' + str(file))
+        session.expect('Type REVEAL'); session.send('REVEAL')
+        session.expect('BIP-39 mnemonic:')
+        session.expect('BIP-39 passphrase: NOT PRESENT')
+        session.expect('Enter to erase the display'); session.send()
+        session.expect('Choose'); session.send('q')
+        session.finish()
+
+
 generation_recovery(24, 'Z' * 512)
 generation_recovery(12, '')
 generation_recovery(12, '  café \\ " 🔐  ')
 cancellation_and_errors()
+word_format_roundtrip()
 print('PASS: 3 complete generation/export/all-share verification/recovery flows; independent Python reconstruction; paging; hidden input; exact terminal restoration; signals; oversized input; non-TTY rejection.')

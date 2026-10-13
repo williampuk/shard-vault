@@ -84,8 +84,8 @@ def generation_recovery(word_count, password):
         if password:
             assert password.encode() not in s.log, 'passphrase input was echoed'
         if len(password) == 512:
-            assert b'token page 1/2' in s.log
-            s.send(']'); s.expect('token page 2/2'); s.expect('Choose')
+            assert b'B39SSS1: token' in s.log
+            s.send(']'); s.expect('page 2/2'); s.expect('Choose')
         s.send('n'); s.expect('SHARE 2/5'); s.expect('Choose')
         s.send('a'); s.expect('Type EXPORT ALL'); s.send('EXPORT ALL')
         s.expect('Name of NEW private folder'); s.send(str(folder))

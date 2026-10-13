@@ -24,9 +24,9 @@ The app refuses pipelines and non-terminal devices. It accepts no wallet secrets
 
 ## Example interactions (public test data only)
 
-These examples show **what to select and what the TUI displays**. Every input field—including menu commands, the mnemonic, file paths, and confirmation phrases—is **hidden** by ShardVault. Lines beginning with \`[operator: ...]\` are **instructions for the reader, not terminal output**. Long randomized share tokens and backup IDs are abbreviated/redacted; **do not copy the placeholders as shares**. Each screen replaces the previous screen, so the excerpts below are not a continuous terminal scrollback.
+These examples show **what to select and what the TUI displays**. Every input field—including menu commands, the mnemonic, file paths, and confirmation phrases—is **hidden** by ShardVault. Lines beginning with `[operator: ...]` are **instructions for the reader, not terminal output**. Long randomized share tokens and backup IDs are abbreviated/redacted; **do not copy the placeholders as shares**. Each screen replaces the previous screen, so the excerpts below are not a continuous terminal scrollback.
 
-The 12-word mnemonic used here is a **public BIP-39 test vector**: \`abandon\` eleven times, followed by \`about\`. It must **never** hold real funds. Paths beginning with \`/home/alice/\` or \`/mnt/\` are illustrative Linux paths: replace them with existing, trusted locations on your machine. The app does **not** expand shell variables or \`~\` in path prompts.
+The 12-word mnemonic used here is a **public BIP-39 test vector**: `abandon` eleven times, followed by `about`. It must **never** hold real funds. Paths beginning with `/home/alice/` or `/mnt/` are illustrative Linux paths: replace them with existing, trusted locations on your machine. The app does **not** expand shell variables or `~` in path prompts.
 
 ### Example 1 — Generate a 3-of-5 backup
 
@@ -46,8 +46,7 @@ ShardVault · BIP-39 SHAMIR BACKUP
 GENERATION · 1 / 3 · INPUT
   Enter all 12 or 24 words on one line. English BIP-39 only.
   BIP-39 mnemonic (hidden input) ›
-  [operator: abandon abandon abandon abandon abandon abandon
-             abandon abandon abandon abandon abandon about]
+  [operator: paste "abandon" eleven times, then "about" (ONE line)]
 
   Mnemonic word list and checksum: valid.
   Include the BIP-39 passphrase in the shares? [y/N] (hidden input) ›
@@ -70,7 +69,7 @@ GENERATION · 3 / 3 · YOUR SHARES
   Choose (hidden input) ›
 ~~~
 
-Shares are random on every generation, **even for the same mnemonic**. Press \`n\` to inspect share 2, \`p\` to go back, or \`]\` and \`[\` to navigate token pages. The displayed page breaks are not part of the token.
+Shares are random on every generation, **even for the same mnemonic**. Press `n` to inspect share 2, `p` to go back, or `]` and `[` to navigate token pages. The displayed page breaks are not part of the token.
 
 For a quick demonstration, export all five shares into a **new temporary private staging directory**:
 
@@ -89,9 +88,9 @@ For a quick demonstration, export all five shares into a **new temporary private
   [operator: Enter]
 ~~~
 
-The directory must **not already exist**; its parent must exist and not be group/other-writable. The resulting files are named \`share-01.txt\` through \`share-05.txt\` and are written with mode \`0600\` inside a private \`0700\` directory. **Separate the files onto genuinely independent, trusted media/locations, then remove the staging copy** (ordinary deletion does not guarantee secure erasure). Keeping three or more shares together compromises this 3-of-5 backup.
+The directory must **not already exist**; its parent must exist and not be group/other-writable. The resulting files are named `share-01.txt` through `share-05.txt` and are written with mode `0600` inside a private `0700` directory. **Separate the files onto genuinely independent, trusted media/locations, then remove the staging copy** (ordinary deletion does not guarantee secure erasure). Keeping three or more shares together compromises this 3-of-5 backup.
 
-To save **just one share** instead, select \`s\`, enter its index (for example, \`2\`), and provide a **new** filename inside an existing, suitably private parent directory. Export never overwrites an existing file.
+To save **just one share** instead, select `s`, enter its index (for example, `2`), and provide a **new** filename inside an existing, suitably private parent directory. Export never overwrites an existing file.
 
 ### Example 2 — Verify all five saved shares
 
@@ -132,7 +131,7 @@ GENERATION · 3 / 3 · YOUR SHARES
   Backup verification: PASSED (all n supplied shares matched).
 ~~~
 
-The \`@\` prefix instructs ShardVault to read a share file; alternatively, paste the **complete** \`B39SSS1:\` token. Paths above are examples, not special device names. Verification confirms share bytes and reconstruction; it cannot guarantee the media are independent, durable, or trustworthy. Press \`q\` to return to the main menu after verification.
+The `@` prefix instructs ShardVault to read a share file; alternatively, paste the **complete** `B39SSS1:` token. Paths above are examples, not special device names. Verification confirms share bytes and reconstruction; it cannot guarantee the media are independent, durable, or trustworthy. Press `q` to return to the main menu after verification.
 
 ### Example 3 — Recover using any three shares
 
@@ -173,7 +172,7 @@ RECOVERED WALLET MATERIAL · PRIVATE
   [operator: Enter]
 ~~~
 
-Without \`REVEAL\`, the mnemonic is not displayed. An excluded passphrase **cannot** be recovered from the shares. Confirm a known wallet address or fingerprint using trusted wallet software before relying on any backup.
+Without `REVEAL`, the mnemonic is not displayed. An excluded passphrase **cannot** be recovered from the shares. Confirm a known wallet address or fingerprint using trusted wallet software before relying on any backup.
 
 ### Example 4 — Include and recover a BIP-39 passphrase
 
@@ -198,7 +197,7 @@ GENERATION · 3 / 3 · YOUR SHARES
   Backup ID: [new random ID]     Policy: 2 of 3     Passphrase included: true
 ~~~
 
-After exporting and independently storing/validating these three shares, restart and recover with **any two**. Following \`REVEAL\`, the mnemonic appears first; the passphrase appears only after you press Enter to view the separate screen:
+After exporting and independently storing/validating these three shares, restart and recover with **any two**. Following `REVEAL`, the mnemonic appears first; the passphrase appears only after you press Enter to view the separate screen:
 
 ~~~text
 RECOVERY · SUCCESS
@@ -221,7 +220,7 @@ RECOVERED BIP-39 PASSPHRASE · PRIVATE
   [operator: Enter]
 ~~~
 
-For a **24-word** trial, another public BIP-39 vector is \`abandon\` repeated **23** times followed by \`art\`. The interaction is identical; recovery reports 24 words. The actual passphrase, if included, is preserved byte-for-byte and displayed as Go-quoted text, so pay attention to significant spaces and Unicode escapes. Including it lets **any threshold number of shares reveal both the mnemonic and the passphrase**.
+For a **24-word** trial, another public BIP-39 vector is `abandon` repeated **23** times followed by `art`. The interaction is identical; recovery reports 24 words. The actual passphrase, if included, is preserved byte-for-byte and displayed as Go-quoted text, so pay attention to significant spaces and Unicode escapes. Including it lets **any threshold number of shares reveal both the mnemonic and the passphrase**.
 
 ## Input and display
 
@@ -253,7 +252,7 @@ A valid **test-only** mnemonic is `abandon` repeated 11 times followed by `about
 2. Provide `m−1` additional, distinct shares from the same set.
 3. The app interpolates the protected payload, checks its internal SHA-256 digest, and reconstructs the original mnemonic. The library additionally checks consistency of surplus shares if more than `m` are provided.
 4. Type **REVEAL** to display the mnemonic. A backed-up passphrase is shown on a separate paginated screen.
-5. Passphrases are shown as **Go-quoted ASCII text**, so control characters, non-ASCII characters, quotes, and backslashes cannot manipulate the terminal. Remove the two-space display indentation and display-only line breaks, join pages, remove the outer quotes, and decode escapes: `\t` is a tab, `\u00e9` is `é`, and `\\` is a single backslash. Do not enter the escaped representation literally into a wallet. Recovery supports all valid legacy payload passphrases, including control characters that the revised generation UI refuses.
+5. Passphrases are shown as **Go-quoted ASCII text**, so control characters, non-ASCII characters, quotes, and backslashes cannot manipulate the terminal. Remove the two-space display indentation and display-only line breaks, join pages, remove the outer quotes, and decode escapes: `\t` is a tab, `\u00e9` is `é`, and `\` is a single backslash. Do not enter the escaped representation literally into a wallet. Recovery supports all valid legacy payload passphrases, including control characters that the revised generation UI refuses.
 6. If the backup excludes the passphrase, recovery cannot tell whether the wallet used one. You still need any separately stored passphrase.
 
 Share files must be regular files. Symlinks, pipes, devices, directories, oversized files, malformed tokens, duplicate indices, inconsistent points, and mixed sets are rejected.

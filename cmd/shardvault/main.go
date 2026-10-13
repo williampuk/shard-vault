@@ -189,6 +189,7 @@ func (t *terminal) generate() error {
 	passphrase, inputBackup.Passphrase = "", ""
 	verified := false
 	selected, page := 0, 0
+    showingWords := false
 	for {
 		width, height, sizeErr := term.GetSize(int(os.Stdout.Fd()))
 		if sizeErr != nil {
@@ -209,21 +210,48 @@ func (t *terminal) generate() error {
 			fmt.Fprintln(t.out, gold+"  Backup verification: NOT YET PERFORMED."+reset)
 		}
 		fmt.Fprintln(t.out, "  Sensitive: keep shares on separate media. Tokens are shown in pages.")
-		token, err := originals[selected].Token()
-		if err != nil {
-			return err
-		}
-		lines, pages := tokenPage(token, width, height, page)
-		if page >= pages {
-			page = pages - 1
-			lines, pages = tokenPage(token, width, height, page)
-		}
-		fmt.Fprintf(t.out, "  SHARE %d/%d · token page %d/%d (save file for complete token)\n", selected+1, total, page+1, pages)
-		for _, line := range lines {
-			fmt.Fprintln(t.out, "  "+line)
-		}
-		fmt.Fprintln(t.out, "  n/p: next/previous share · ]/[: next/previous token page")
-		fmt.Fprintln(t.out, "  s: save one · a: export all · v: verify ALL n backups · q: quit")
+        var lines []string
+        var pages int
+        if showingWords {
+            words, err := originals[selected].Words()
+            if err != nil {
+                return err
+            }
+            lines, pages = wordPage(words, height, page)
+        } else {
+            token, err := originals[selected].Token()
+            if err != nil {
+                return err
+            }
+            lines, pages = tokenPage(token, width, height, page)
+        }
+        if page >= pages {
+            page = pages-1
+            if showingWords {
+                words, err := originals[selected].Words()
+                if err != nil {
+                    return err
+                }
+                lines, pages = wordPage(words, height, page)
+            } else {
+                token, err := originals[selected].Token()
+                if err != nil {
+                    return err
+                }
+                lines, pages = tokenPage(token, width, height, page)
+            }
+        }
+        representation := "B39SSS1: token"
+        if showingWords {
+            representation = "B39WORDS1: English words"
+        }
+        fmt.Fprintf(t.out, "  SHARE %d/%d · %s · page %d/%d\n", selected+1, total, representation, page+1, pages)
+        for _, line := range lines {
+            fmt.Fprintln(t.out, "  "+line)
+        }
+        fmt.Fprintln(t.out, "  n/p: share · ]/[: page · t: toggle Base64 / English words")
+        fmt.Fprintln(t.out, "  s: save token · w: save words · a: export all tokens")
+        fmt.Fprintln(t.out, "  e: export all words · v: verify all · q: quit")
 		command, err := t.ask("Choose")
 		if err != nil {
 			return err
@@ -254,8 +282,11 @@ func (t *terminal) generate() error {
 				}
 			}
 			return nil
-		case "s":
-			i, err := t.askInt("Share index to save", 1, total)
+        case "t":
+            showingWords = !showingWords
+            page = 0
+        case "s", "w":
+            i, err := t.askInt("Share index to save", 1, total)
 			if err != nil {
 				return err
 			}
@@ -263,15 +294,21 @@ func (t *terminal) generate() error {
 			if err != nil {
 				return err
 			}
-			if err := saveShare(strings.TrimSpace(path), originals[i-1]); err != nil {
-				fmt.Fprintln(t.out, red+"  Export failed: "+safeError(err)+reset)
-			} else {
-				fmt.Fprintln(t.out, green+"  Share saved with restrictive permissions."+reset)
-			}
+            var saveErr error
+            if strings.ToLower(strings.TrimSpace(command)) == "w" {
+                saveErr = saveWords(strings.TrimSpace(path), originals[i-1])
+            } else {
+                saveErr = saveShare(strings.TrimSpace(path), originals[i-1])
+            }
+            if saveErr != nil {
+                fmt.Fprintln(t.out, red+"  Export failed: "+safeError(saveErr)+reset)
+            } else {
+                fmt.Fprintln(t.out, green+"  Share saved with restrictive permissions."+reset)
+            }
 			if _, err := t.ask("Enter to continue"); err != nil {
 				return err
 			}
-		case "a":
+		case "a", "e":
 			fmt.Fprintln(t.out, red+"  WARNING: Storing the entire share set together defeats physical separation!"+reset)
 			confirm, err := t.ask("Type EXPORT ALL to create a staging folder")
 			if err != nil {
@@ -284,11 +321,17 @@ func (t *terminal) generate() error {
 			if err != nil {
 				return err
 			}
-			if err := saveAll(strings.TrimSpace(folder), originals); err != nil {
-				fmt.Fprintln(t.out, red+"  Export failed: "+safeError(err)+reset)
-			} else {
-				fmt.Fprintln(t.out, green+"  Export complete. Move shares to independent media; DO NOT retain an entire set together."+reset)
-			}
+            var exportErr error
+            if strings.ToLower(strings.TrimSpace(command)) == "e" {
+                exportErr = saveAllWords(strings.TrimSpace(folder), originals)
+            } else {
+                exportErr = saveAll(strings.TrimSpace(folder), originals)
+            }
+            if exportErr != nil {
+                fmt.Fprintln(t.out, red+"  Export failed: "+safeError(exportErr)+reset)
+            } else {
+                fmt.Fprintln(t.out, green+"  Export complete. Move shares to independent media; DO NOT retain an entire set together."+reset)
+            }
 			if _, err := t.ask("Enter to continue"); err != nil {
 				return err
 			}
@@ -332,7 +375,7 @@ func (t *terminal) readShare(prompt string) (share.Share, error) {
 			s = string(data)
 			clear(data)
 		}
-		parsed, err := share.Parse(s)
+		parsed, err := share.ParseInput(s)
 		if err != nil {
 			fmt.Fprintln(t.out, red+"  Invalid share: "+safeError(err)+reset)
 			continue
@@ -380,7 +423,7 @@ func (t *terminal) validateAll(originals []share.Share) error {
 func (t *terminal) recover() error {
 	t.screen("RECOVERY · COLLECT SHARES")
 	fmt.Fprintln(t.out, "  Collect ANY m DISTINCT shares from the SAME backup set.")
-	fmt.Fprintln(t.out, "  Only B39SSS1 share tokens are supported; not SLIP-0039 words.")
+	fmt.Fprintln(t.out, "  Accepts B39SSS1: tokens or B39WORDS1: English shares; NOT SLIP-39.")
 	first, err := t.readShare("Share 1")
 	if err != nil {
 		return err
@@ -498,7 +541,8 @@ func (t *terminal) help() error {
 	fmt.Fprintln(t.out, "  • Shamir splits the original entropy, and optionally the passphrase.")
 	fmt.Fprintln(t.out, "  • If included, ANY m shares disclose both mnemonic and passphrase.")
 	fmt.Fprintln(t.out, "  • A single share (or fewer than m) is insufficient to reconstruct.")
-	fmt.Fprintln(t.out, "  • These long B39SSS1 tokens are NOT SLIP-39/Trezor Shamir words.")
+	fmt.Fprintln(t.out, "  • Toggle B39SSS1: tokens / B39WORDS1: words using t.")
+    fmt.Fprintln(t.out, "  • Neither custom format is SLIP-39 / AirGap-compatible.")
 	fmt.Fprintln(t.out, "  • Restore requires this software or a compatible B39SSS1 decoder.")
 	fmt.Fprintln(t.out, "  • Test your backup using independently stored shares and a disposable wallet.")
 	fmt.Fprintln(t.out, "  • Never enter real wallet words on an internet-exposed or compromised PC.")
@@ -511,6 +555,28 @@ func (t *terminal) help() error {
 }
 
 // Reserve screen space for the menu; paginate even a maximum-length token.
+// wordPage breaks on whole dictionary words so no screen line splits a word.
+// The prefix is shown on every page and must be retained when transcribing.
+func wordPage(input string, height, page int) ([]string, int) {
+    parts := strings.Fields(input)
+    if len(parts) < 2 {
+        return []string{"Invalid word share"}, 1
+    }
+    const perLine = 6 // BIP-39 English words are short; fits an 80-column terminal.
+    rows := max(1, height-17)
+    wordsPerPage := perLine*rows
+    words := parts[1:]
+    pages := max(1, (len(words)+wordsPerPage-1)/wordsPerPage)
+    page = min(max(page, 0), pages-1)
+    start := page*wordsPerPage
+    end := min(start+wordsPerPage, len(words))
+    lines := []string{parts[0]}
+    for i := start; i < end; i += perLine {
+        lines = append(lines, strings.Join(words[i:min(i+perLine, end)], " "))
+    }
+    return lines, pages
+}
+
 func tokenPage(token string, width, height, page int) ([]string, int) {
 	columns, rows := max(1, width-4), max(1, height-16)
 	size := columns * rows

@@ -2,7 +2,7 @@
 
 **ShardVault** is a local Go terminal application for backing up BIP-39 wallet recovery material with Shamir’s Secret Sharing. The CLI executable is `shardvault`.
 
-Back up a **12- or 24-word English BIP-39 mnemonic**, optionally with its BIP-39 passphrase, as 2–16 Shamir shares. Any `m` distinct shares from an `m`-of-`n` set recover the original material. The app supports individual file export, all-share backup verification, and recovery.
+Back up a **12- or 24-word English BIP-39 mnemonic**, optionally with its BIP-39 passphrase, as 2–16 Shamir shares. Any `m` distinct shares from an `m`-of-`n` set recover the original material. The app supports individual file export, all-share backup verification, and recovery. Shares can be shown and exported as the original **`B39SSS1:` tokens** or as **`B39WORDS1:` English-word shares**; either format can be used for recovery, including a mixture of both.
 
 **Reviewed revision, 2026-10-13.** See [REVIEW.md](REVIEW.md) for findings, fixes, test evidence, and remaining limitations. This remains a custom, educational implementation—not professionally audited wallet software. Test with disposable wallet material before considering real use.
 
@@ -61,7 +61,7 @@ GENERATION · 2 / 3 · THRESHOLD
 GENERATION · 3 / 3 · YOUR SHARES
   Backup ID: [random ID]     Policy: 3 of 5     Passphrase included: false
   Backup verification: NOT YET PERFORMED.
-  SHARE 1/5 · token page 1/1 (save file for complete token)
+  SHARE 1/5 · B39SSS1: token · page 1/1
   B39SSS1:[randomized token body redacted]
 
   n/p: next/previous share · ]/[: next/previous token page
@@ -222,6 +222,70 @@ RECOVERED BIP-39 PASSPHRASE · PRIVATE
 
 For a **24-word** trial, another public BIP-39 vector is `abandon` repeated **23** times followed by `art`. The interaction is identical; recovery reports 24 words. The actual passphrase, if included, is preserved byte-for-byte and displayed as Go-quoted text, so pay attention to significant spaces and Unicode escapes. Including it lets **any threshold number of shares reveal both the mnemonic and the passphrase**.
 
+### Example 5 — English words and mixed-format recovery
+
+These are **English dictionary words encoding one Shamir share**, not another
+BIP-39 mnemonic. The format marker is **`B39WORDS1:`**. Start from a generated
+3-of-5 backup, then select **`t`** at the share viewer to toggle the format:
+
+~~~text
+GENERATION · 3 / 3 · YOUR SHARES
+  Choose (hidden input) ›
+  [operator: t]
+
+  SHARE 1/5 · B39WORDS1: English words · page 1/[several]
+  B39WORDS1:
+  [six English BIP-39 words per line; randomized share REDACTED]
+  [additional words / pages REDACTED]
+
+  n/p: share · ]/[: page · t: toggle Base64 / English words
+  s: save token · w: save words · a: export all tokens
+  e: export all words · v: verify all · q: quit
+  Choose (hidden input) ›
+  [operator: w]
+  Share index to save (1..5) (hidden input) ›
+  [operator: 1]
+  Absolute or relative new file path (will not overwrite) (hidden input) ›
+  [operator: /home/alice/share-01-words.txt]
+  Share saved with restrictive permissions.
+~~~
+
+You can select **`e`** to export the **whole set** as word files to a NEW
+private staging folder (with the same `EXPORT ALL` confirmation), or **`a`**
+to keep exporting original Base64 tokens. The `s`, `w`, `a`, and `e`
+commands operate independently of whichever display you selected with `t`.
+
+A word file contains the marker `B39WORDS1:` on its first line and
+six words per subsequent line. For recovery, supply either the **entire**
+word sequence (including the marker, via bracketed paste in a terminal
+supporting it) or its file path:
+
+~~~text
+RECOVERY · COLLECT SHARES
+  Share 1 (paste token or @file; q cancels) (hidden input) ›
+  [operator: @/home/alice/share-01-words.txt]
+
+  Set ID: [same random ID]     Threshold: 3 of 5
+  Share 2/3 (paste token or @file; q cancels) (hidden input) ›
+  [operator: @/mnt/usb-b/share-02.txt  (legacy B39SSS1 token file)]
+  Share 3/3 (paste token or @file; q cancels) (hidden input) ›
+  [operator: @/mnt/usb-c/share-03-words.txt]
+
+RECOVERY · SUCCESS
+  Successfully reconstructed 12-word BIP-39 mnemonic.
+~~~
+
+This shows **two word shares and one old-format token share** recovering
+the exact same backup. They must belong to the same backup ID and policy.
+Verification during generation also accepts mixed formats.
+
+Because the encoding includes the original full wrapper and SHA-256 checksum,
+a **12-word mnemonic without a backed-up passphrase produces 87 English
+words per share**, a 24-word mnemonic produces **99**, and a 24-word backup
+with a 512-byte passphrase produces **471**. This is deliberately more
+verbose than AirGap or SLIP-39, and **is not compatible with either**.
+Do not treat the sample placeholders as actual share data.
+
 ## Input and display
 
 - **All input is hidden**, including menu choices and file paths. Press Enter to submit. Backspace removes a character; Ctrl-U clears the line; Ctrl-C or Ctrl-D exits.
@@ -236,11 +300,11 @@ For a **24-word** trial, another public BIP-39 vector is `abandon` repeated **23
 2. Choose whether to include the BIP-39 passphrase. The default is **No**. If included, enter it twice. Generation accepts printable UTF-8 text, including spaces, up to **512 bytes**; control characters are refused. Leading/trailing spaces, case, and Unicode bytes are preserved. The app does not normalize the passphrase or derive a wallet seed.
 3. Set total shares `n` and recovery threshold `m`, with `2 <= m <= n <= 16`.
 4. The app reconstructs the generated set and compares it against your original entropy and passphrase before displaying any shares.
-5. View **one share at a time**. Use `n`/`p` for the next/previous share, and `]`/`[` for long-token pages. Page breaks are display formatting, not token contents. File export is preferable to manually joining token pages.
+5. View **one share at a time**. Use `n`/`p` for the next/previous share, `t` to switch between Base64 and English words, and `]`/`[` for pages. Word pages never split a word. Screen page breaks are display formatting, not extra share data. Keep the `B39WORDS1:` format label when transcribing words.
 6. Export:
-   - `s`: save one chosen share to a new file. Its parent directory must already exist and must not be group/other-writable.
-   - `a`: export all shares to a new private directory after typing `EXPORT ALL`. This creates a complete, recoverable secret in one place; use it only for temporary staging and separate the shares afterward.
-7. Choose **v**. Supply **all `n` shares**, in any order, from their actual storage destinations. Paste a complete token or enter `@/path/to/share.txt`. Every value must exactly match its generated share, and all points must form a consistent reconstructable set.
+   - `s`: save one chosen share as a legacy Base64url token; `w`: save it as English words. Parent directories must already exist and must not be group/other-writable.
+   - `a`: export all shares as legacy tokens; `e`: export all shares as English words. Both create a new private staging directory after typing `EXPORT ALL`. This creates a complete, recoverable secret in one place; use it only for temporary staging and separate the shares afterward.
+7. Choose **v**. Supply **all `n` shares**, in any order, from their actual storage destinations. Paste a complete `B39SSS1:` or `B39WORDS1:` value, or enter `@/path/to/share.txt`. Mixing representations of shares from the **same set** is allowed. Every share must exactly match its generated data.
 8. An unverified session requires `DISCARD` before a normal return to the main menu. Ctrl-C remains an emergency exit. Verification cannot prove that you used independent media; the software can only check the supplied bytes.
 9. Perform a cold recovery drill: restart, choose recovery, and use any `m` independently stored shares. Separately verify a known wallet address or fingerprint with trusted wallet software.
 
@@ -248,7 +312,7 @@ A valid **test-only** mnemonic is `abandon` repeated 11 times followed by `about
 
 ## Recovery
 
-1. Choose **2** and enter the first share token or `@file`. The app shows its declared set ID and threshold.
+1. Choose **2** and enter the first share (`B39SSS1:` token, `B39WORDS1:` words, or `@file`). The app shows its declared set ID and threshold.
 2. Provide `m−1` additional, distinct shares from the same set.
 3. The app interpolates the protected payload, checks its internal SHA-256 digest, and reconstructs the original mnemonic. The library additionally checks consistency of surplus shares if more than `m` are provided.
 4. Type **REVEAL** to display the mnemonic. A backed-up passphrase is shown on a separate paginated screen.
@@ -267,7 +331,7 @@ Including the passphrase means **any `m` shares reveal both factors**. Excluding
 
 ## Compatibility and security limits
 
-- **The format is unchanged: `B39SSS1:`.** Valid backups generated by the original version remain recoverable. These are custom base64url tokens, **not SLIP-39 mnemonic shares**, and cannot be entered into hardware wallets as SLIP-39 backups. Keep this source and [FORMAT.md](docs/FORMAT.md) for future recovery.
+- **Original binary format remains unchanged: `B39SSS1:`.** Valid backups generated by the original version remain recoverable. The optional `B39WORDS1:` display/transport encoding maps the complete checksummed binary wrapper into English BIP-39 dictionary words, with canonical zero padding. Neither format is SLIP-39 or AirGap-compatible, and neither should be entered into hardware wallets as SLIP-39 shares. Keep the source and [FORMAT.md](docs/FORMAT.md) for future recovery.
 - Independent CSPRNG coefficients are sampled uniformly from GF(256), including zero. Given fewer than `m` correctly generated shares, the payload bytes are hidden; public metadata and payload length remain visible. The length can reveal or constrain mnemonic/passphrase lengths. There is no fixed-size padding.
 - The wrapper and payload use **unkeyed checksums**, not signatures or MACs. They detect accidental damage and most inconsistent recovery attempts; they do not establish who created a backup or that it is your wallet. Metadata is not cryptographically bound into the inner payload. An attacker can relabel a complete set's ID/total, and an attacker who replaces the entire set can substitute a valid different wallet. Compare wallet identity separately and keep custody of original shares.
 - Export opens a new file exclusively, enforces/checks `0600` **before writing**, syncs the file and destination directory, and does not overwrite an existing target or final symlink. Directory handles anchor writes. Use trusted, existing parent paths. Mode checks are OS-level checks, not proof that removable media is encrypted or inaccessible on another machine. Filesystems that cannot enforce the requested permissions are refused.
@@ -277,7 +341,7 @@ Including the passphrase means **any `m` shares reveal both factors**. Excluding
 
 ## Verification
 
-Completed on Linux amd64 using **Go 1.27.2**, with the real dependencies:
+The original pre-word-format review was completed on Linux amd64 using **Go 1.27.2**, with the real dependencies. These findings refer to that revision; new word-format code requires its own complete build and test pass:
 
 - Complete tests, race detector, `go vet`, and module checksum verification.
 - Offline vendored build and tests.
@@ -298,7 +362,7 @@ The report explains these checks and their limits. Testing and this review do no
 cmd/shardvault/       Interactive application, raw input, file operations
 internal/backup/          BIP-39 entropy/mnemonic conversion and official vectors
 internal/shamir/          GF(256) sharing and interpolation
-internal/share/           Versioned tokens, protected payload, recovery checks
+internal/share/           Versioned tokens, word encoding, protected payload, recovery checks
 tests/                    Public-data Python oracle and real-PTY integration tests
 docs/FORMAT.md            Full compatible v1 format specification
 REVIEW.md                 Findings and verification evidence

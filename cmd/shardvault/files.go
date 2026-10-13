@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+    "strings"
 
 	"github.com/williampuk/shard-vault/internal/share"
 	"golang.org/x/sys/unix"
@@ -26,8 +27,8 @@ func readShareFile(path string) ([]byte, error) {
 	if !info.Mode().IsRegular() {
 		return nil, errors.New("share input must be a regular file, not a device, pipe, directory, or symlink")
 	}
-	data, err := io.ReadAll(io.LimitReader(f, int64(share.MaxTokenBytes+3)))
-	if err != nil || len(data) > share.MaxTokenBytes+2 {
+	data, err := io.ReadAll(io.LimitReader(f, int64(share.MaxShareInputBytes+3)))
+	if err != nil || len(data) > share.MaxShareInputBytes+2 {
 		clear(data)
 		if err != nil {
 			return nil, err
@@ -66,10 +67,32 @@ func syncDirectory(root *os.Root) error {
 }
 
 func writeShare(root *os.Root, name string, s share.Share) error {
-	token, err := s.Token()
-	if err != nil {
-		return err
-	}
+    return writeShareWithEncoding(root, name, s, false)
+}
+
+func writeShareWithEncoding(root *os.Root, name string, s share.Share, words bool) error {
+    token, err := s.Token()
+    if words {
+        token, err = s.Words()
+        if err == nil {
+            parts := strings.Fields(token)
+            // Keep the format label on its own line, with six words per line.
+            var output strings.Builder
+            output.WriteString(parts[0])
+            for i, word := range parts[1:] {
+                if i%6 == 0 {
+                    output.WriteByte('\n')
+                } else {
+                    output.WriteByte(' ')
+                }
+                output.WriteString(word)
+            }
+            token = output.String()
+        }
+    }
+    if err != nil {
+        return err
+    }
 	f, err := root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
 		return err
@@ -109,6 +132,14 @@ func writeShare(root *os.Root, name string, s share.Share) error {
 }
 
 func saveShare(path string, s share.Share) error {
+    return saveShareWithEncoding(path, s, false)
+}
+
+func saveWords(path string, s share.Share) error {
+    return saveShareWithEncoding(path, s, true)
+}
+
+func saveShareWithEncoding(path string, s share.Share, words bool) error {
 	if err := s.Validate(); err != nil {
 		return err
 	}
@@ -120,10 +151,18 @@ func saveShare(path string, s share.Share) error {
 		return err
 	}
 	defer root.Close()
-	return writeShare(root, filepath.Base(path), s)
+	return writeShareWithEncoding(root, filepath.Base(path), s, words)
 }
 
 func saveAll(dir string, shares []share.Share) error {
+    return saveAllWithEncoding(dir, shares, false)
+}
+
+func saveAllWords(dir string, shares []share.Share) error {
+    return saveAllWithEncoding(dir, shares, true)
+}
+
+func saveAllWithEncoding(dir string, shares []share.Share, words bool) error {
 	if err := share.VerifyAll(shares, shares); err != nil {
 		return err
 	}
@@ -155,7 +194,7 @@ func saveAll(dir string, shares []share.Share) error {
 		return fmt.Errorf("cannot sync new directory; no shares written: %w", err)
 	}
 	for _, s := range shares {
-		if err := writeShare(root, fmt.Sprintf("share-%02d.txt", s.Index), s); err != nil {
+		if err := writeShareWithEncoding(root, fmt.Sprintf("share-%02d.txt", s.Index), s, words); err != nil {
 			return fmt.Errorf("export incomplete; some shares may remain in the folder: %w", err)
 		}
 	}

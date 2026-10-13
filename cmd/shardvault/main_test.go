@@ -203,7 +203,7 @@ func TestShareFiles(t *testing.T) {
     if err != nil {
         t.Fatal(err)
     }
-    if !strings.HasPrefix(string(wordText), share.WordPrefix+"\\n") {
+    if !strings.HasPrefix(string(wordText), share.WordPrefix+"\n") {
         t.Fatal("word file missing header")
     }
     fromWords, err := share.ParseInput(string(wordText))

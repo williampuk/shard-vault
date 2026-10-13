@@ -77,6 +77,40 @@ func TestWordSharesRoundTripAndMixedRecovery(t *testing.T) {
     }
 }
 
+// Every permitted passphrase byte length exercises a different set of 11-bit
+// boundaries. This specifically checks the canonical final padding bits.
+func TestWordEncodingAllPayloadLengths(t *testing.T) {
+    for length := 0; length <= MaxPassphraseBytes; length++ {
+        backup := Backup{Entropy: make([]byte, 32)}
+        if length != 0 {
+            backup.Passphrase = strings.Repeat("p", length)
+            backup.IncludesPassphrase = true
+        }
+        shares, err := Generate(backup, 2, 2)
+        if err != nil {
+            t.Fatal(err)
+        }
+        original, err := shares[0].Token()
+        if err != nil {
+            t.Fatal(err)
+        }
+        words, err := shares[0].Words()
+        if err != nil {
+            t.Fatal(err)
+        }
+        restored, err := ParseWords(words)
+        if err != nil {
+            t.Fatalf("passphrase length %d: %v", length, err)
+        }
+        token, err := restored.Token()
+        if err != nil || token != original {
+            t.Fatalf("passphrase length %d changed serialized share", length)
+        }
+        clear(restored.Value)
+        Clear(shares)
+    }
+}
+
 func TestWordShareRejectsCorruptionAndNoncanonicalEncoding(t *testing.T) {
     shares, err := Generate(Backup{Entropy: make([]byte, 16)}, 2, 3)
     if err != nil {

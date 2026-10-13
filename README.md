@@ -22,6 +22,207 @@ Or use `make build`, `make test`, and `make integration`. The compiled applicati
 
 The app refuses pipelines and non-terminal devices. It accepts no wallet secrets through command-line flags or environment variables. `stty` is no longer required.
 
+## Example interactions (public test data only)
+
+These examples show **what to select and what the TUI displays**. Every input field—including menu commands, the mnemonic, file paths, and confirmation phrases—is **hidden** by ShardVault. Lines beginning with \`[operator: ...]\` are **instructions for the reader, not terminal output**. Long randomized share tokens and backup IDs are abbreviated/redacted; **do not copy the placeholders as shares**. Each screen replaces the previous screen, so the excerpts below are not a continuous terminal scrollback.
+
+The 12-word mnemonic used here is a **public BIP-39 test vector**: \`abandon\` eleven times, followed by \`about\`. It must **never** hold real funds. Paths beginning with \`/home/alice/\` or \`/mnt/\` are illustrative Linux paths: replace them with existing, trusted locations on your machine. The app does **not** expand shell variables or \`~\` in path prompts.
+
+### Example 1 — Generate a 3-of-5 backup
+
+Start the program and choose **1** to generate shares. In this example the optional BIP-39 passphrase is **not** included.
+
+~~~text
+$ ./shardvault
+
+ShardVault · BIP-39 SHAMIR BACKUP
+  (1) Generate m-of-n shares from a BIP-39 mnemonic
+  (2) Recover a mnemonic from m shares
+  (3) Safety and compatibility information
+  (q) Quit
+  Choose (hidden input) ›
+  [operator: 1]
+
+GENERATION · 1 / 3 · INPUT
+  Enter all 12 or 24 words on one line. English BIP-39 only.
+  BIP-39 mnemonic (hidden input) ›
+  [operator: abandon abandon abandon abandon abandon abandon
+             abandon abandon abandon abandon abandon about]
+
+  Mnemonic word list and checksum: valid.
+  Include the BIP-39 passphrase in the shares? [y/N] (hidden input) ›
+  [operator: n]
+
+GENERATION · 2 / 3 · THRESHOLD
+  Number of shares (n) (2..16) (hidden input) ›
+  [operator: 5]
+  Shares required to recover (m) (2..5) (hidden input) ›
+  [operator: 3]
+
+GENERATION · 3 / 3 · YOUR SHARES
+  Backup ID: [random ID]     Policy: 3 of 5     Passphrase included: false
+  Backup verification: NOT YET PERFORMED.
+  SHARE 1/5 · token page 1/1 (save file for complete token)
+  B39SSS1:[randomized token body redacted]
+
+  n/p: next/previous share · ]/[: next/previous token page
+  s: save one · a: export all · v: verify ALL n backups · q: quit
+  Choose (hidden input) ›
+~~~
+
+Shares are random on every generation, **even for the same mnemonic**. Press \`n\` to inspect share 2, \`p\` to go back, or \`]\` and \`[\` to navigate token pages. The displayed page breaks are not part of the token.
+
+For a quick demonstration, export all five shares into a **new temporary private staging directory**:
+
+~~~text
+  Choose (hidden input) ›
+  [operator: a]
+
+  WARNING: Storing the entire share set together defeats physical separation!
+  Type EXPORT ALL to create a staging folder (hidden input) ›
+  [operator: EXPORT ALL]
+  Name of NEW private folder (hidden input) ›
+  [operator: /home/alice/shardvault-example-stage]
+
+  Export complete. Move shares to independent media; DO NOT retain an entire set together.
+  Enter to continue (hidden input) ›
+  [operator: Enter]
+~~~
+
+The directory must **not already exist**; its parent must exist and not be group/other-writable. The resulting files are named \`share-01.txt\` through \`share-05.txt\` and are written with mode \`0600\` inside a private \`0700\` directory. **Separate the files onto genuinely independent, trusted media/locations, then remove the staging copy** (ordinary deletion does not guarantee secure erasure). Keeping three or more shares together compromises this 3-of-5 backup.
+
+To save **just one share** instead, select \`s\`, enter its index (for example, \`2\`), and provide a **new** filename inside an existing, suitably private parent directory. Export never overwrites an existing file.
+
+### Example 2 — Verify all five saved shares
+
+While still on the generation screen, choose **v**. The application requires **all five** shares—not merely the threshold three—and compares them against the generated values. Read them from their **actual backup locations**, not from the tokens currently displayed in memory.
+
+~~~text
+GENERATION · 3 / 3 · YOUR SHARES
+  Choose (hidden input) ›
+  [operator: v]
+
+VERIFY BACKUP · ALL n SHARES
+  Read the 5 shares from their ACTUAL saved destinations, in any order.
+  Verified 0/5 (paste token or @file; q cancels) (hidden input) ›
+  [operator: @/mnt/usb-e/share-05.txt]
+  Share 5 is an exact match.
+
+  Verified 1/5 (paste token or @file; q cancels) (hidden input) ›
+  [operator: @/mnt/usb-b/share-02.txt]
+  Share 2 is an exact match.
+
+  Verified 2/5 (paste token or @file; q cancels) (hidden input) ›
+  [operator: @/mnt/usb-d/share-04.txt]
+  Share 4 is an exact match.
+
+  Verified 3/5 (paste token or @file; q cancels) (hidden input) ›
+  [operator: @/mnt/usb-a/share-01.txt]
+  Share 1 is an exact match.
+
+  Verified 4/5 (paste token or @file; q cancels) (hidden input) ›
+  [operator: @/mnt/usb-c/share-03.txt]
+  Share 3 is an exact match.
+
+  SUCCESS: all n saved/pasted shares exactly match; m-of-n reconstruction works.
+  Enter to continue (hidden input) ›
+  [operator: Enter]
+
+GENERATION · 3 / 3 · YOUR SHARES
+  Backup verification: PASSED (all n supplied shares matched).
+~~~
+
+The \`@\` prefix instructs ShardVault to read a share file; alternatively, paste the **complete** \`B39SSS1:\` token. Paths above are examples, not special device names. Verification confirms share bytes and reconstruction; it cannot guarantee the media are independent, durable, or trustworthy. Press \`q\` to return to the main menu after verification.
+
+### Example 3 — Recover using any three shares
+
+For a meaningful recovery drill, **quit and restart the app** so the original generation session is gone. Choose **2** and supply any three *distinct* shares from the **same** backup ID. They need not be in order.
+
+~~~text
+ShardVault · BIP-39 SHAMIR BACKUP
+  Choose (hidden input) ›
+  [operator: 2]
+
+RECOVERY · COLLECT SHARES
+  Share 1 (paste token or @file; q cancels) (hidden input) ›
+  [operator: @/mnt/usb-e/share-05.txt]
+
+  Set ID: [same random ID]     Threshold: 3 of 5
+  Share 2/3 (paste token or @file; q cancels) (hidden input) ›
+  [operator: @/mnt/usb-a/share-01.txt]
+  Share 3/3 (paste token or @file; q cancels) (hidden input) ›
+  [operator: @/mnt/usb-c/share-03.txt]
+
+RECOVERY · SUCCESS
+  Successfully reconstructed 12-word BIP-39 mnemonic.
+  No BIP-39 passphrase was included in this backup.
+  Your secrets are hidden until explicitly revealed.
+  Type REVEAL to show them on-screen (hidden input) ›
+  [operator: REVEAL]
+
+RECOVERED WALLET MATERIAL · PRIVATE
+  BIP-39 mnemonic:
+   1. abandon        2. abandon        3. abandon
+   4. abandon        5. abandon        6. abandon
+   7. abandon        8. abandon        9. abandon
+  10. abandon       11. abandon       12. about
+
+  BIP-39 passphrase: NOT PRESENT in this share set.
+  If the wallet used a separate passphrase, you MUST still supply it.
+  Enter to erase the display and return to the menu (hidden input) ›
+  [operator: Enter]
+~~~
+
+Without \`REVEAL\`, the mnemonic is not displayed. An excluded passphrase **cannot** be recovered from the shares. Confirm a known wallet address or fingerprint using trusted wallet software before relying on any backup.
+
+### Example 4 — Include and recover a BIP-39 passphrase
+
+This is a **separate** example backup. Choose **y** at the passphrase question, enter the same **public demonstration passphrase** twice, and choose an independent **2-of-3** share set. The passphrase is not an actual 13th or 25th mnemonic word.
+
+~~~text
+GENERATION · 1 / 3 · INPUT
+  Include the BIP-39 passphrase in the shares? [y/N] (hidden input) ›
+  [operator: y]
+  BIP-39 passphrase (exact spelling/case/spaces) (hidden input) ›
+  [operator: correct horse battery staple]
+  Repeat passphrase (hidden input) ›
+  [operator: correct horse battery staple]
+
+GENERATION · 2 / 3 · THRESHOLD
+  Number of shares (n) (2..16) (hidden input) ›
+  [operator: 3]
+  Shares required to recover (m) (2..3) (hidden input) ›
+  [operator: 2]
+
+GENERATION · 3 / 3 · YOUR SHARES
+  Backup ID: [new random ID]     Policy: 2 of 3     Passphrase included: true
+~~~
+
+After exporting and independently storing/validating these three shares, restart and recover with **any two**. Following \`REVEAL\`, the mnemonic appears first; the passphrase appears only after you press Enter to view the separate screen:
+
+~~~text
+RECOVERY · SUCCESS
+  Successfully reconstructed 12-word BIP-39 mnemonic.
+  This backup ALSO contains the original BIP-39 passphrase.
+  Type REVEAL to show them on-screen (hidden input) ›
+  [operator: REVEAL]
+
+RECOVERED WALLET MATERIAL · PRIVATE
+  BIP-39 mnemonic:
+  [12 test words shown here]
+  Enter to view the included passphrase on a separate screen (hidden input) ›
+  [operator: Enter]
+
+RECOVERED BIP-39 PASSPHRASE · PRIVATE
+  Exact UTF-8 length: 28 bytes · page 1/1
+  "correct horse battery staple"
+  Go-quoted text: join pages, remove outer quotes, decode escapes.
+  n/p: next/previous page · Enter: erase and finish (hidden input) ›
+  [operator: Enter]
+~~~
+
+For a **24-word** trial, another public BIP-39 vector is \`abandon\` repeated **23** times followed by \`art\`. The interaction is identical; recovery reports 24 words. The actual passphrase, if included, is preserved byte-for-byte and displayed as Go-quoted text, so pay attention to significant spaces and Unicode escapes. Including it lets **any threshold number of shares reveal both the mnemonic and the passphrase**.
+
 ## Input and display
 
 - **All input is hidden**, including menu choices and file paths. Press Enter to submit. Backspace removes a character; Ctrl-U clears the line; Ctrl-C or Ctrl-D exits.

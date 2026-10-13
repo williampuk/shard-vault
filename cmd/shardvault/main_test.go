@@ -88,6 +88,39 @@ func TestTokenPagination(t *testing.T) {
 		}
 	}
 }
+func TestWordPagination(t *testing.T) {
+    shares, err := share.Generate(share.Backup{Entropy: make([]byte, 32), Passphrase: strings.Repeat("P", 512), IncludesPassphrase: true}, 3, 5)
+    if err != nil {
+        t.Fatal(err)
+    }
+    defer share.Clear(shares)
+    words, err := shares[0].Words()
+    if err != nil {
+        t.Fatal(err)
+    }
+    expected := strings.Fields(words)
+    for _, height := range []int{24, 32} {
+        _, pages := wordPage(words, height, 0)
+        if pages < 2 {
+            t.Fatal("expected multiple screens of words")
+        }
+        var got []string
+        for page := 0; page < pages; page++ {
+            lines, count := wordPage(words, height, page)
+            if count != pages || lines[0] != share.WordPrefix {
+                t.Fatal("missing prefix or incorrect word paging")
+            }
+            if len(lines) > max(1, height-17)+1 {
+                t.Fatal("word view exceeds screen")
+            }
+            got = append(got, strings.Fields(strings.Join(lines[1:], " "))...)
+        }
+        if strings.Join(got, " ") != strings.Join(expected[1:], " ") {
+            t.Fatal("word pages lost or duplicated words")
+        }
+    }
+}
+
 func TestSafeErrors(t *testing.T) {
 	text := safeError(errors.New("bad\x1b[2J\n\u202e"))
 	if strings.ContainsAny(text, "\x1b\n\u202e") {
@@ -146,7 +179,7 @@ func TestShareFiles(t *testing.T) {
 		t.Fatal("read FIFO")
 	}
 	huge := filepath.Join(dir, "huge")
-	if err := os.WriteFile(huge, bytes.Repeat([]byte{'A'}, share.MaxTokenBytes+3), 0600); err != nil {
+	if err := os.WriteFile(huge, bytes.Repeat([]byte{'A'}, share.MaxShareInputBytes+3), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := readShareFile(huge); err == nil {
@@ -162,6 +195,32 @@ func TestShareFiles(t *testing.T) {
 	if err := saveShare(filepath.Join(public, "no.txt"), shares[0]); err == nil {
 		t.Fatal("accepted writable directory")
 	}
+    wordPath := filepath.Join(dir, "word-share.txt")
+    if err := saveWords(wordPath, shares[0]); err != nil {
+        t.Fatal(err)
+    }
+    wordText, err := readShareFile(wordPath)
+    if err != nil {
+        t.Fatal(err)
+    }
+    if !strings.HasPrefix(string(wordText), share.WordPrefix+"\\n") {
+        t.Fatal("word file missing header")
+    }
+    fromWords, err := share.ParseInput(string(wordText))
+    if err != nil || !bytes.Equal(fromWords.Value, shares[0].Value) {
+        t.Fatal("word file did not round trip")
+    }
+    wordDir := filepath.Join(dir, "word-set")
+    if err := saveAllWords(wordDir, shares); err != nil {
+        t.Fatal(err)
+    }
+    allWords, err := readShareFile(filepath.Join(wordDir, "share-02.txt"))
+    if err != nil {
+        t.Fatal(err)
+    }
+    if _, err := share.ParseInput(string(allWords)); err != nil {
+        t.Fatal(err)
+    }
 	set := filepath.Join(dir, "set")
 	if err := saveAll(set, shares); err != nil {
 		t.Fatal(err)
